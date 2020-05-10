@@ -55,7 +55,7 @@ class WeatherInformation
   WEATHER_JSON_FILE_NAME = "forecast.json"
   LOCATION_API_URL = "https://freegeoip.app/json/"
   LOCATION_JSON_FILE_NAME = "location.json"
-  LOCATION_INFORMATION_EXPIRY_TIME_LIMIT = 300
+  LOCATION_INFORMATION_EXPIRY_TIME_LIMIT = 600
 
   attr_reader :userLocationInfo, :userWeatherInfo
 
@@ -90,14 +90,35 @@ class WeatherInformation
       apiUri =  URI(LOCATION_API_URL)
       response = Net::HTTP.get(apiUri)
 
-      fetchTimeInfo = {:fetch_date_time => DateTime.now.iso8601(3)}
+      fetchDateTimeInfo = {"fetch_date_time" => DateTime.now.iso8601(3).to_s}
       @userLocationInfo = JSON.parse(response)
-      @userLocationInfo.merge!(fetchTimeInfo)
+      @userLocationInfo.merge!(fetchDateTimeInfo)
       updateFile(LOCATION_JSON_FILE_NAME, @userLocationInfo)
     end
   end
 
+  def checkWeatherFile
+    if (File.exists?(WEATHER_JSON_FILE_NAME))
+      fileData = readFromFile(WEATHER_JSON_FILE_NAME)
+      @userWeatherInfo = JSON.parse(fileData)
+    end
+  end
+
+  def reupdateUserWeather?
+    mustUpdate = true
+
+    unless (@userWeatherInfo.nil?)
+      dateTimeNow = DateTime.iso8601(DateTime.now.to_s)
+      weatherNextUpdate = DateTime.iso8601(@userWeatherInfo["meta"]["model"]["nextrun"])
+      mustUpdate = dateTimeNow > weatherNextUpdate
+    end
+
+    return mustUpdate
+  end
+
   def getUserWeather
+    checkWeatherFile
+
     if (reupdateUserLocation?)
       getUserLocation
     end
@@ -110,6 +131,9 @@ class WeatherInformation
     response = Net::HTTP.get(apiUri)
 
     @userWeatherInfo = JSON.parse(response)
+    filterWeatherData
+    fetchDateTimeInfo = {"fetch_date_time" => DateTime.now.iso8601(3).to_s}
+    @userWeatherInfo.merge!(fetchDateTimeInfo)
     updateFile(WEATHER_JSON_FILE_NAME, @userWeatherInfo)
   end
 
@@ -119,27 +143,16 @@ class WeatherInformation
   # one hour, three hour and six hour intervals. Only the information 
   # in one hour intervals is needed, the rest are removed by this method
   #
-  def filterWeatherData(weatherData)
+  def filterWeatherData
+    @userWeatherInfo["product"]["time"] = 
+      @userWeatherInfo["product"]["time"].select{ |data| data["to"] == data["from"] }
   end
 
 end
 
 def main
   currentWeatherInfo = WeatherInformation.new
-  puts currentWeatherInfo.userLocationInfo
-  #
-  # test = DateTime.iso8601("2020-05-03T22:30:38+08:00")
-  # test2 = DateTime.now.iso8601(3)
-  # test3 = DateTime.iso8601(test2)
-  # puts test
-  # puts test3
-  # puts ((test-test3)*24*60*60).to_i
-
-  # if (test < test3)
-  #      puts "nice"
-  # else
-  #      puts "uh-oh"
-  # end
+  currentWeatherInfo.getUserWeather
 end
 
 main
