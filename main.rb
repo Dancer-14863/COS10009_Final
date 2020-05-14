@@ -2,6 +2,7 @@
 require 'net/http'
 require 'json'
 require 'date'
+require 'gosu'
 
 module JSONFileOperations
   ##
@@ -119,22 +120,23 @@ class WeatherInformation
   def getUserWeather
     checkWeatherFile
 
-    if (reupdateUserLocation?)
-      getUserLocation
+    if (reupdateUserWeather?)
+      url = WEATHER_API_URL % {
+        lat: @userLocationInfo["latitude"],
+        lon: @userLocationInfo["longitude"]
+      }
+      apiUri = URI(url)
+      response = Net::HTTP.get(apiUri)
+
+      @userWeatherInfo = JSON.parse(response)
+      filterWeatherData
+      fetchDateTimeInfo = {"fetch_date_time" => DateTime.now.iso8601(3).to_s}
+      @userWeatherInfo.merge!(fetchDateTimeInfo)
+      updateFile(WEATHER_JSON_FILE_NAME, @userWeatherInfo)
     end
 
-    url = WEATHER_API_URL % {
-      lat: @userLocationInfo["latitude"],
-      lon: @userLocationInfo["longitude"]
-    }
-    apiUri = URI(url)
-    response = Net::HTTP.get(apiUri)
-
-    @userWeatherInfo = JSON.parse(response)
-    filterWeatherData
-    fetchDateTimeInfo = {"fetch_date_time" => DateTime.now.iso8601(3).to_s}
-    @userWeatherInfo.merge!(fetchDateTimeInfo)
-    updateFile(WEATHER_JSON_FILE_NAME, @userWeatherInfo)
+    forecastArray = @userWeatherInfo["product"]["time"]
+    return forecastArray
   end
 
   ##
@@ -150,9 +152,38 @@ class WeatherInformation
 
 end
 
-def main
-  currentWeatherInfo = WeatherInformation.new
-  currentWeatherInfo.getUserWeather
+class ForecastApp < Gosu::Window
+  WIN_WIDTH = 640
+  WIN_HEIGHT = 480
+
+  def initialize
+    super(WIN_WIDTH, WIN_HEIGHT, false)
+    self.caption = "Weather Forecast"
+    @background = Gosu::Color::WHITE
+
+    currentWeatherInfo = WeatherInformation.new
+    @forecastInformation = currentWeatherInfo.getUserWeather
+  end
+
+  def update
+
+  end
+
+  def draw
+  end
+
 end
+
+window = ForecastApp.new
+window.show
+
+# def main
+  # currentWeatherInfo = WeatherInformation.new
+  # test = currentWeatherInfo.getUserWeather
+  # testdate = DateTime.iso8601(test[0]["to"])
+  # offset =  Time.now.getlocal.strftime("%:z")
+  # testdate = testdate.new_offset(offset)
+  # puts testdate
+# end
 
 main
