@@ -58,7 +58,7 @@ class WeatherInformation
   LOCATION_JSON_FILE_NAME = "location.json"
   LOCATION_INFORMATION_EXPIRY_TIME_LIMIT = 600
 
-  attr_reader :userLocationInfo, :userWeatherInfo
+  attr_reader :userLocationInfo
 
   def initialize
     getUserLocation
@@ -113,8 +113,7 @@ class WeatherInformation
       weatherNextUpdate = DateTime.iso8601(@userWeatherInfo["meta"]["model"]["nextrun"])
       mustUpdate = dateTimeNow > weatherNextUpdate
     end
-
-    return mustUpdate
+return mustUpdate
   end
 
   def getUserWeather
@@ -152,6 +151,10 @@ class WeatherInformation
 
 end
 
+module ZOrder
+  BACKGROUND, MIDDLE, TOP = *0..2
+end
+
 class ForecastApp < Gosu::Window
   WIN_WIDTH = 640
   WIN_HEIGHT = 480
@@ -160,16 +163,36 @@ class ForecastApp < Gosu::Window
     super(WIN_WIDTH, WIN_HEIGHT, false)
     self.caption = "Weather Forecast"
     @background = Gosu::Color::WHITE
+    @uiFont = Gosu::Font.new(18)
+    @primaryFontColor = Gosu::Color.argb(0xff_000000)
+    @infoFontLevelOne = Gosu::Font.new(29)
+    @infoFontLevelTwo = Gosu::Font.new(23)
 
-    currentWeatherInfo = WeatherInformation.new
-    @forecastInformation = currentWeatherInfo.getUserWeather
+    @currentWeatherInfo = WeatherInformation.new
+    @weatherForecast = @currentWeatherInfo.getUserWeather
+    @userLocation = currentLocationString
+    updateUserTime
   end
 
   def update
-
+    updateUserTime
   end
 
   def draw
+    # Drawing Background
+    Gosu.draw_rect(0, 0, WIN_WIDTH, WIN_HEIGHT, @background, ZOrder::BACKGROUND, mode=:default)
+    @uiFont.draw_text("Time: #{@userTime}",10, 10, ZOrder::MIDDLE, 1.0, 1.0, @primaryFontColor)
+    @infoFontLevelOne.draw_text_rel("#{@weatherForecast[0]["location"]["temperature"]["value"]}°C", WIN_WIDTH / 2, WIN_HEIGHT / 2, ZOrder::MIDDLE, 0.5, 0.5, 1.0, 1.0, @primaryFontColor)
+    @infoFontLevelTwo.draw_text_rel("#{@userLocation}", WIN_WIDTH / 2, WIN_HEIGHT / 2 + 50, ZOrder::MIDDLE, 0.5, 0.5, 1.0, 1.0, @primaryFontColor)
+  end
+
+  def updateUserTime
+    @userTime = DateTime.now().strftime("%H:%M:%S")
+  end
+  
+  def currentLocationString
+    locationInfo = @currentWeatherInfo.userLocationInfo
+    return "#{locationInfo["city"]} #{locationInfo["region_name"]}, #{locationInfo["country_name"]}"
   end
 
 end
