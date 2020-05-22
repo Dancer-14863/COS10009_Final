@@ -3,6 +3,7 @@ require 'net/http'
 require 'json'
 require 'date'
 require 'gosu'
+require "open-uri"
 
 module JSONFileOperations
   ##
@@ -49,6 +50,8 @@ end
 
 ##
 # TODO: - Add catch statements if the api call fails
+# TODO: - Add private and public methods
+# TODO: - Make sure weather updates if location updates
 #
 class WeatherInformation
   include JSONFileOperations
@@ -57,6 +60,8 @@ class WeatherInformation
   LOCATION_API_URL = "https://freegeoip.app/json/"
   LOCATION_JSON_FILE_NAME = "location.json"
   LOCATION_INFORMATION_EXPIRY_TIME_LIMIT = 600
+  WEATHER_ICON_URL = "https://api.met.no/weatherapi/weathericon/1.1/?symbol=%{symbol_id}&is_night=%{is_night}&content_type=image/png"
+  WEATHER_ICON_NAME = "weather_symbol.png"
 
   attr_reader :userLocationInfo
 
@@ -110,10 +115,13 @@ class WeatherInformation
 
     unless (@userWeatherInfo.nil?)
       dateTimeNow = DateTime.iso8601(DateTime.now.to_s)
-      weatherNextUpdate = DateTime.iso8601(@userWeatherInfo["meta"]["model"]["nextrun"])
-      mustUpdate = dateTimeNow > weatherNextUpdate
+      weatherNextUpdate = DateTime.iso8601(@userWeatherInfo["product"]["time"][0]["to"])
+      # Adds five minutes to the update time
+      # enabling the request server to be updated properly
+      weatherNextUpdate += Rational(5 * 60, 86400)
+      mustUpdate = dateTimeNow >= weatherNextUpdate
     end
-return mustUpdate
+    return mustUpdate
   end
 
   def getUserWeather
@@ -128,25 +136,35 @@ return mustUpdate
       response = Net::HTTP.get(apiUri)
 
       @userWeatherInfo = JSON.parse(response)
-      filterWeatherData
+      @userWeatherInfo["product"]["time"] = @userWeatherInfo["product"]["time"].shift(2)
       fetchDateTimeInfo = {"fetch_date_time" => DateTime.now.iso8601(3).to_s}
       @userWeatherInfo.merge!(fetchDateTimeInfo)
       updateFile(WEATHER_JSON_FILE_NAME, @userWeatherInfo)
+      downloadWeatherIcon
     end
 
     forecastArray = @userWeatherInfo["product"]["time"]
     return forecastArray
   end
 
-  ##
-  # Removes unwanted information from weather data object
-  # The weather api returns location weather forecasts in
-  # one hour, three hour and six hour intervals. Only the information 
-  # in one hour intervals is needed, the rest are removed by this method
-  #
-  def filterWeatherData
-    @userWeatherInfo["product"]["time"] = 
-      @userWeatherInfo["product"]["time"].select{ |data| data["to"] == data["from"] }
+  def downloadWeatherIcon
+    unless (@userWeatherInfo.nil?)
+      symbolId = @userWeatherInfo["product"]["time"][1]["location"]["symbol"]["number"]
+      iconURL = WEATHER_ICON_URL % {
+        symbol_id: symbolId,
+        is_night: isNight ? "1" : "0"
+      }
+      open(iconURL) do |image|
+        File.open(WEATHER_ICON_NAME, "wb") do |file|
+          file.write(image.read)
+        end
+      end
+    end
+  end
+
+  def isNight
+    currentHour = Time.now.hour
+    return currentHour > 20 || currentHour < 6
   end
 
 end
@@ -171,23 +189,62 @@ class ForecastApp < Gosu::Window
     @currentWeatherInfo = WeatherInformation.new
     @weatherForecast = @currentWeatherInfo.getUserWeather
     @userLocation = currentLocationString
+    @currentForecastIndex = 0
+    @weatherIcon = Gosu::Image.new("weather_symbol.png")
     updateUserTime
+
   end
 
   def update
     updateUserTime
+    if (@currentWeatherInfo.reupdateUserWeather?)
+      @weatherForecast = @currentWeatherInfo.getUserWeather
+    end
   end
 
   def draw
     # Drawing Background
     Gosu.draw_rect(0, 0, WIN_WIDTH, WIN_HEIGHT, @background, ZOrder::BACKGROUND, mode=:default)
+    # Users Local Time
     @uiFont.draw_text("Time: #{@userTime}",10, 10, ZOrder::MIDDLE, 1.0, 1.0, @primaryFontColor)
-    @infoFontLevelOne.draw_text_rel("#{@weatherForecast[0]["location"]["temperature"]["value"]}°C", WIN_WIDTH / 2, WIN_HEIGHT / 2, ZOrder::MIDDLE, 0.5, 0.5, 1.0, 1.0, @primaryFontColor)
-    @infoFontLevelTwo.draw_text_rel("#{@userLocation}", WIN_WIDTH / 2, WIN_HEIGHT / 2 + 50, ZOrder::MIDDLE, 0.5, 0.5, 1.0, 1.0, @primaryFontColor)
+    # Draws Current Forecast's Temperature
+    @infoFontLevelOne.draw_text_rel(
+      "#{@weatherForecast[@currentForecastIndex]["location"]["temperature"]["value"]}°C", 
+      WIN_WIDTH / 2, 
+      WIN_HEIGHT / 2, 
+      ZOrder::MIDDLE, 
+      0.5, 
+      0.5, 
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
+    # Draws Users Current Location Address
+    @infoFontLevelTwo.draw_text_rel(
+      "#{@userLocation}", 
+      WIN_WIDTH / 2, 
+      WIN_HEIGHT / 2 + 30, 
+      ZOrder::MIDDLE, 
+      0.5, 
+      0.5, 
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
+    @weatherIcon.draw_rot(
+      WIN_WIDTH / 2,
+      WIN_HEIGHT / 2 - 40,
+      ZOrder::MIDDLE,
+      0,
+      0.5,
+      0.5,
+      2,
+      2
+    )
   end
 
   def updateUserTime
-    @userTime = DateTime.now().strftime("%H:%M:%S")
+    @userTime = DateTime.now.strftime("%H:%M:%S")
   end
   
   def currentLocationString
@@ -199,14 +256,3 @@ end
 
 window = ForecastApp.new
 window.show
-
-# def main
-  # currentWeatherInfo = WeatherInformation.new
-  # test = currentWeatherInfo.getUserWeather
-  # testdate = DateTime.iso8601(test[0]["to"])
-  # offset =  Time.now.getlocal.strftime("%:z")
-  # testdate = testdate.new_offset(offset)
-  # puts testdate
-# end
-
-main
