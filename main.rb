@@ -253,6 +253,7 @@ class ForecastApp < Gosu::Window
   end
 
   def update
+    Gosu.button_down? Gosu::KB_ESCAPE 
     updateUserTime
 
     # Checks if the weather information should be updated
@@ -315,6 +316,38 @@ class ForecastApp < Gosu::Window
       1.0, 
       @primaryFontColor
     )
+    # Draws forecast humidity
+    @uiFont.draw_text(
+      "Humidity: #{@weatherForecast["main"]["humidity"]}%", 
+      10, 
+      WIN_HEIGHT - 30, 
+      ZOrder::MIDDLE, 
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
+    # Draws forecast wind speed
+    @uiFont.draw_text_rel(
+      "Wind: #{@weatherForecast["wind"]["speed"]}m/s", 
+      WIN_WIDTH / 2, 
+      WIN_HEIGHT - 30, 
+      ZOrder::MIDDLE, 
+      0.5, 
+      0.0, 
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
+    # Draws forecast pressure
+    @uiFont.draw_text(
+      "Pressure: #{@weatherForecast["main"]["pressure"]}hPa", 
+      WIN_WIDTH / 2 + 180, 
+      WIN_HEIGHT - 30, 
+      ZOrder::MIDDLE, 
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
   end
 
   ##
@@ -350,6 +383,17 @@ class ForecastApp < Gosu::Window
   # @return [Float] Temperature in Celcius rouned to 1dp
   def convertToCelcius(temperature)
     return (temperature - 273.15).round(1)
+  end
+
+  ## 
+  # Closes window if escape button is pressed
+  # Borrowed from weekly task
+  def button_down(id)
+    if id == Gosu::KB_ESCAPE
+      close
+    else
+      super
+    end
   end
 
 end
