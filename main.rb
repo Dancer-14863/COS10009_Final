@@ -228,16 +228,41 @@ module ZOrder
   BACKGROUND, MIDDLE, TOP = *0..2
 end
 
+# TODO - Refactor color sheme toggle
+# TODO - Refactor coordinate
 class ForecastApp < Gosu::Window
   WIN_WIDTH = 640
   WIN_HEIGHT = 480
+  BUTTON_WIDTH = 100
+  BUTTON_HEIGHT = 50
 
   def initialize
     super(WIN_WIDTH, WIN_HEIGHT, false)
     self.caption = "Weather Forecast"
-    @background = Gosu::Color.rgb(46, 40, 42)
+
+    @colorShemes = Hash[
+      "dark" => [
+        [46, 40, 42],
+        [230, 230, 230]
+      ],
+      "light" => [
+        [230, 230, 230],
+        [46, 40, 42]
+      ]
+    ]
+    @currentScheme = "dark"
+    @background = Gosu::Color.rgb(
+      @colorShemes[@currentScheme][0][0],
+      @colorShemes[@currentScheme][0][1],
+      @colorShemes[@currentScheme][0][2]
+    )
     @uiFont = Gosu::Font.new(18)
-    @primaryFontColor = Gosu::Color.rgb(230, 230, 230)
+    @primaryFontColor = Gosu::Color.rgb(
+      @colorShemes[@currentScheme][1][0],
+      @colorShemes[@currentScheme][1][1],
+      @colorShemes[@currentScheme][1][2]
+    )
+    @buttonColor = Gosu::Color.rgb(255, 107, 107)
 
     # Used for different font levels
     @infoFontLevelOne = Gosu::Font.new(29)
@@ -249,12 +274,18 @@ class ForecastApp < Gosu::Window
     @userWeatherMessage = currentWeatherMessage 
     @weatherIcon = Gosu::Image.new("weather_symbol.png")
 
-    updateUserTime
+    @buttonCoord = [
+      WIN_WIDTH - BUTTON_WIDTH - 10,
+      10
+    ]
+
+    updateUserDateTime
   end
 
   def update
     Gosu.button_down? Gosu::KB_ESCAPE 
-    updateUserTime
+    Gosu.button_down? Gosu::MsLeft 
+    updateUserDateTime
 
     # Checks if the weather information should be updated
     if (@currentWeatherInfo.reupdateUserWeather?)
@@ -267,8 +298,39 @@ class ForecastApp < Gosu::Window
   def draw
     # Drawing Background
     Gosu.draw_rect(0, 0, WIN_WIDTH, WIN_HEIGHT, @background, ZOrder::BACKGROUND, mode=:default)
-    # Users Local Time
-    @uiFont.draw_text("Time: #{@userTime}",10, 10, ZOrder::MIDDLE, 1.0, 1.0, @primaryFontColor)
+    # User Local Date
+    @uiFont.draw_text("Date: #{@userDate}",10, 10, ZOrder::MIDDLE, 1.0, 1.0, @primaryFontColor)
+    Gosu.draw_rect(
+      @buttonCoord[0],
+      @buttonCoord[1],
+      BUTTON_WIDTH, 
+      BUTTON_HEIGHT, 
+      @buttonColor, 
+      ZOrder::MIDDLE, 
+      mode=:default
+    )
+    @uiFont.draw_text_rel(
+      "Toggle",
+      (WIN_WIDTH- BUTTON_WIDTH - 10) + BUTTON_WIDTH/ 2,
+      (BUTTON_HEIGHT) /2 + 10, 
+      ZOrder::TOP, 
+      0.5,
+      0.5,
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
+    @infoFontLevelTwo.draw_text_rel(
+      "#{@userDay}, #{@userTime}", 
+      WIN_WIDTH / 2, 
+      WIN_HEIGHT / 2 - 110, 
+      ZOrder::MIDDLE, 
+      0.5, 
+      0.5, 
+      1.0, 
+      1.0, 
+      @primaryFontColor
+    )
     # Draws Users Current Location Address
     @infoFontLevelOne.draw_text_rel(
       "#{@userLocation}", 
@@ -296,7 +358,7 @@ class ForecastApp < Gosu::Window
     @infoFontLevelOne.draw_text_rel(
       "#{convertToCelcius(@weatherForecast["main"]["temp"])}°C", 
       WIN_WIDTH / 2, 
-      WIN_HEIGHT / 2 + 60, 
+      WIN_HEIGHT / 2 + 70, 
       ZOrder::MIDDLE, 
       0.5, 
       0.5, 
@@ -308,7 +370,7 @@ class ForecastApp < Gosu::Window
     @infoFontLevelTwo.draw_text_rel(
       "#{@userWeatherMessage}", 
       WIN_WIDTH / 2, 
-      WIN_HEIGHT / 2 + 90, 
+      WIN_HEIGHT / 2 + 100, 
       ZOrder::MIDDLE, 
       0.5, 
       0.5, 
@@ -339,11 +401,13 @@ class ForecastApp < Gosu::Window
       @primaryFontColor
     )
     # Draws forecast pressure
-    @uiFont.draw_text(
+    @uiFont.draw_text_rel(
       "Pressure: #{@weatherForecast["main"]["pressure"]}hPa", 
-      WIN_WIDTH / 2 + 180, 
+      WIN_WIDTH - 10, 
       WIN_HEIGHT - 30, 
       ZOrder::MIDDLE, 
+      1.0,
+      0.0,
       1.0, 
       1.0, 
       @primaryFontColor
@@ -351,11 +415,18 @@ class ForecastApp < Gosu::Window
   end
 
   ##
-  # Updates @userTime to the current local time
-  def updateUserTime
-    @userTime = DateTime.now.strftime("%H:%M:%S")
+  # Adds cursor to window
+  def needs_cursor?
+    true
   end
 
+  ##
+  def updateUserDateTime
+    today = DateTime.now
+    @userTime = today.strftime("%H:%M:%S")
+    @userDate = today.strftime("%F")
+    @userDay = today.strftime("%A")
+  end
   
   ##
   # Returns the description in the api response
@@ -385,15 +456,41 @@ class ForecastApp < Gosu::Window
     return (temperature - 273.15).round(1)
   end
 
-  ## 
-  # Closes window if escape button is pressed
-  # Borrowed from weekly task
   def button_down(id)
-    if id == Gosu::KB_ESCAPE
+    case id
+    when Gosu::KB_ESCAPE
       close
+    when Gosu::MsLeft
+      if (mouse_over_button?(mouse_x, mouse_y))
+        toggleTheme
+      end
     else
       super
     end
+  end
+
+  def mouse_over_button?(mouse_x, mouse_y)
+    if (mouse_x > @buttonCoord[0] && mouse_x < @buttonCoord[0] + BUTTON_WIDTH) && 
+        (mouse_y > @buttonCoord[1] && mouse_y < @buttonCoord[1] + BUTTON_HEIGHT)
+      true
+    else
+      false
+    end
+  end
+
+  def toggleTheme
+    @currentScheme == "dark" ? @currentScheme = "light" : @currentScheme = "dark"
+    @background = Gosu::Color.rgb(
+      @colorShemes[@currentScheme][0][0],
+      @colorShemes[@currentScheme][0][1],
+      @colorShemes[@currentScheme][0][2]
+    )
+    @uiFont = Gosu::Font.new(18)
+    @primaryFontColor = Gosu::Color.rgb(
+      @colorShemes[@currentScheme][1][0],
+      @colorShemes[@currentScheme][1][1],
+      @colorShemes[@currentScheme][1][2]
+    )
   end
 
 end
