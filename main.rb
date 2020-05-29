@@ -7,7 +7,7 @@ require "open-uri"
 
 ##
 # Contains common file operations
-# used for this project
+# which are used for this project
 module JSONFileOperations
   ##
   # Clears the contents of a file
@@ -49,10 +49,6 @@ module JSONFileOperations
 
 end
 
-##
-# TODO: - Add catch statements if the api call fails
-# TODO: - Make sure weather updates if location updates
-#
 class WeatherInformation
   include JSONFileOperations
 
@@ -88,12 +84,23 @@ class WeatherInformation
   # Name for the weather icon file
   WEATHER_ICON_NAME = "weather_symbol.png"
 
-  attr_reader :userLocationInfo
+  attr_reader :userLocationInfo, :userWeatherInfo
 
   ##
   # Inits a Weather Information object
   def initialize
+    ##
+    # Stores the user's previous location
+    # in the format of [latitude, longitude]
+    @userPreviousLocation = Array.new(2)
+    @locationChanged = false
     getUserLocation
+    # If the location has changed then weather information is
+    # updated as well, so it doesn't have to be called again. This
+    # checks if the weather information has been updated already
+    if (@userWeatherInfo.nil?)
+      getUserWeather
+    end
   end
 
   ##
@@ -136,7 +143,20 @@ class WeatherInformation
 
       # Saves the response in file
       updateFile(LOCATION_JSON_FILE_NAME, @userLocationInfo)
+
+      if (userLocationChanged?)
+        @locationChanged = true
+        getUserWeather
+        # Stores the current location values
+        @userPreviousLocation[0] = @userLocationInfo["latitude"]
+        @userPreviousLocation[1] = @userLocationInfo["longitude"]
+        # Resets the flag
+        @locationChanged = false
+      end
+
     end
+
+    return @userLocationInfo
   end
 
   ##
@@ -144,12 +164,13 @@ class WeatherInformation
   # This is done if
   #   (1) The user weather information is nil
   #   (2) The weather information has expired
+  #   (3) The users location has changed
   #
   # @returns [Boolean] Returns true if weather info should be updated else false
   def reupdateUserWeather?
     mustUpdate = true
 
-    unless (@userWeatherInfo.nil?)
+    unless (@userWeatherInfo.nil? || @locationChanged)
       dateTimeNow = DateTime.iso8601(DateTime.now.to_s)
       # DateTime at which weather information was fetched
       fetchDateTime = DateTime.iso8601(@userWeatherInfo["fetch_date_time"])
@@ -202,6 +223,23 @@ class WeatherInformation
   private
 
   ##
+  # This checks if the user's location has changed from 
+  # the previously recorded location.
+  #
+  # @return [Boolean] True/False depending on location change
+  def userLocationChanged?
+    locationChanged = true
+    unless (@userPreviousLocation[0].nil?)
+        latitude = @userLocationInfo["latitude"]
+        longitude = @userLocationInfo["longitude"]
+        locationChanged = !(@userPreviousLocation[0] == latitude &&
+          @userPreviousLocation[1] == longitude)
+    end
+
+    return locationChanged
+  end
+
+  ##
   # Checks if the location save file
   # exists and if it does loads its contents
   # to @userLocationInfo
@@ -209,6 +247,8 @@ class WeatherInformation
     if (File.exists?(LOCATION_JSON_FILE_NAME))
       fileData = readFromFile(LOCATION_JSON_FILE_NAME)
       @userLocationInfo = JSON.parse(fileData)
+      @userPreviousLocation[0] = @userLocationInfo["latitude"]
+      @userPreviousLocation[1] = @userLocationInfo["longitude"]
     end
   end
 
@@ -246,16 +286,25 @@ class WeatherInformation
 
 end
 
+##
+# Holds information regarding the z-order
+# of elements in the Gosu Window
 module ZOrder
   BACKGROUND, MIDDLE, TOP = *0..2
 end
 
-# TODO - Refactor color sheme toggle
-# TODO - Refactor coordinate
 class ForecastApp < Gosu::Window
+  ##
+  # Window width of Weather App
   WIN_WIDTH = 640
+  ##
+  # Window height of Weather App
   WIN_HEIGHT = 480
+  ##
+  # Width of the toggle theme button
   BUTTON_WIDTH = 100
+  ##
+  # Height of the toggle theme button
   BUTTON_HEIGHT = 50
 
   ##
@@ -299,7 +348,7 @@ class ForecastApp < Gosu::Window
 
     # Fetches location and weather information
     @currentWeatherInfo = WeatherInformation.new
-    @weatherForecast = @currentWeatherInfo.getUserWeather
+    @weatherForecast = @currentWeatherInfo.userWeatherInfo
     @userLocation = currentLocationString
     @userWeatherMessage = currentWeatherMessage 
     @weatherIcon = Gosu::Image.new("weather_symbol.png")
@@ -537,6 +586,9 @@ class ForecastApp < Gosu::Window
   # Toggles the colorsheme between light/dark
   def toggleTheme
     @currentScheme == "dark" ? @currentScheme = "light" : @currentScheme = "dark"
+
+    # Updating the current background and font colors
+    # with the new theme
     @background = Gosu::Color.rgb(
       @colorShemes[@currentScheme][0][0],
       @colorShemes[@currentScheme][0][1],
