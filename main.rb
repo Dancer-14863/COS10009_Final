@@ -49,6 +49,10 @@ module JSONFileOperations
 
 end
 
+##
+# Handles all weather forecast related
+# tasks. User location and weather forecast infromation
+# fetching, updating and saving are handled by this class
 class WeatherInformation
   include JSONFileOperations
 
@@ -104,7 +108,7 @@ class WeatherInformation
   end
 
   ##
-  # Checks if the user location information should be updated
+  # Checks if the user location information should be updated.
   # This is done if
   #   (1) The user location information is nil
   #   (2) The location information has expired
@@ -160,7 +164,7 @@ class WeatherInformation
   end
 
   ##
-  # Checks if the user weather information should be updated
+  # Checks if the user weather information should be updated.
   # This is done if
   #   (1) The user weather information is nil
   #   (2) The weather information has expired
@@ -293,6 +297,11 @@ module ZOrder
   BACKGROUND, MIDDLE, TOP = *0..2
 end
 
+## 
+# Handles the front end of the application.
+# Makes use of a WeatherInformation class instance
+# to get user forecast information, which is then displayed to 
+# the user.
 class ForecastApp < Gosu::Window
   ##
   # Window width of Weather App
@@ -371,14 +380,14 @@ class ForecastApp < Gosu::Window
     # Checks if user location information should be 
     # updated
     if (@currentWeatherInfo.reupdateUserLocation?)
-      puts "Updating User Location"
+      puts "Updating User Location at #{@userTime} #{@userDate}"
       @currentWeatherInfo.getUserLocation
       @userLocation = currentLocationString
     end
 
     # Checks if the weather information should be updated
     if (@currentWeatherInfo.reupdateUserWeather?)
-      puts "Updating Weather Information"
+      puts "Updating Weather Information at #{@userTime} #{@userDate}"
       @weatherForecast = @currentWeatherInfo.getUserWeather
       @userWeatherMessage = currentWeatherMessage 
     end
@@ -525,8 +534,8 @@ class ForecastApp < Gosu::Window
   end
   
   ##
-  # Returns the description in the api response
-  # capitalizes it as well
+  # Returns the description in the api response,
+  # capitalizes it as well.
   #
   # @return [String] Capitalized version of the description
   def currentWeatherMessage
@@ -534,7 +543,7 @@ class ForecastApp < Gosu::Window
   end
   
   ##
-  # Returns a string containing the users location
+  # Returns a string containing the users location.
   # Its in the format
   #   City Region, Country
   # 
@@ -553,7 +562,7 @@ class ForecastApp < Gosu::Window
   end
 
   ##
-  # Checks if a button has been pressed
+  # Checks if a button has been pressed.
   # Reused from weekly tasks
   def button_down(id)
     case id
