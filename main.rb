@@ -60,14 +60,14 @@ class WeatherInformation
   # Unique value provided by API service
   API_KEY = "2c4294e1b221ea4d08cde0eeba687d31"
   ##
-  # URL for weather api call
+  # URL for weather api call.
   # Documentation: https://openweathermap.org/current
   WEATHER_API_URL = "https://api.openweathermap.org/data/2.5/weather?lat=%{lat}&lon=%{lon}&appid=%{apiKey}"
   ##
   # Filename for weather information saving
   WEATHER_JSON_FILE_NAME = "forecast.json"
   ##
-  # URL for ip location api call
+  # URL for ip location api call.
   # Documentation: https://freegeoip.app/
   LOCATION_API_URL = "https://freegeoip.app/json/"
   ##
@@ -113,7 +113,7 @@ class WeatherInformation
   #   (1) The user location information is nil
   #   (2) The location information has expired
   #
-  # @returns [Boolean] Returns true if location info should be updated else false
+  # @return [Boolean] Returns true if location info should be updated else false
   def reupdateUserLocation?
     mustUpdate = true
 
@@ -170,7 +170,7 @@ class WeatherInformation
   #   (2) The weather information has expired
   #   (3) The users location has changed
   #
-  # @returns [Boolean] Returns true if weather info should be updated else false
+  # @return [Boolean] Returns true if weather info should be updated else false
   def reupdateUserWeather?
     mustUpdate = true
 
@@ -515,6 +515,8 @@ class ForecastApp < Gosu::Window
     )
   end
 
+  private
+
   ##
   # Adds cursor to window
   def needs_cursor?
@@ -522,7 +524,8 @@ class ForecastApp < Gosu::Window
   end
 
   ##
-  # Updates the following attributes
+  # Updates the app datetime to user local datetime.
+  # Updates the following attributes.
   #   @userTime - current local time in Hour:Minute:Second format
   #   @userDate - current local date in Year-Month-Date format
   #   @userDay  - current day of the week
@@ -554,7 +557,7 @@ class ForecastApp < Gosu::Window
   end
 
   ## 
-  # Converts Kelvin temperature to Celcius
+  # Converts temperature from Kelvin to Celcius.
   #
   # @return [Float] Temperature in Celcius rouned to 1dp
   def convertToCelcius(temperature)
