@@ -58,7 +58,7 @@ class WeatherInformation
 
   ##
   # Unique value provided by API service
-  API_KEY = "2c4294e1b221ea4d08cde0eeba687d31"
+  API_KEY = ""
   ##
   # URL for weather api call.
   # Documentation: https://openweathermap.org/current
